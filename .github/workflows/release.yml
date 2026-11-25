@@ -2,94 +2,139 @@
 # Copyright (C) 2026 BlackBearReloaded
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-name: Release PS5 artifacts
+name: Build PS5 artifacts
 
 on:
-  release:
-    types: [published]
+  push:
+    branches: [main]
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+  pull_request:
   workflow_dispatch:
-    inputs:
-      tag:
-        description: Existing GitHub Release tag to receive the artifacts
-        required: true
-        type: string
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: ps5-artifacts-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  build-and-upload:
-    name: Build and attach PS5 artifacts
-    runs-on: [self-hosted, ps5-sdk]
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    outputs:
+      name: ${{ steps.metadata.outputs.name }}
     env:
-      RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
       CPYTHON_REF: 823f0323ee6ec1402088b73bce1a38473cac36dc
       PS5_SDK_REF: 4eb701204fc3f8d31e84cf8ca272974e2be9c867
+      CCACHE_DIR: ${{ github.workspace }}/.ps5-ccache
+      CCACHE_MAXSIZE: 500M
     steps:
-      - name: Check out source
-        uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
-      - name: Verify release tools
-        shell: bash
+      - name: Install build dependencies
         run: |
-          set -eu
-          command -v git
-          command -v make
-          command -v tar
-          command -v sha256sum
-          command -v gh
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang-18 lld-18 llvm-18 ccache curl xz-utils
 
-      - name: Fetch pinned CPython source
-        shell: bash
-        run: |
-          set -eu
-          source_dir="$GITHUB_WORKSPACE/upstream/cpython"
-          mkdir -p "$(dirname "$source_dir")"
-          git clone --depth 1 https://github.com/python/cpython.git "$source_dir"
-          git -C "$source_dir" fetch --depth 1 origin "$CPYTHON_REF"
-          git -C "$source_dir" checkout --detach "$CPYTHON_REF"
-          git -C "$source_dir" apply \
-            "$GITHUB_WORKSPACE/patches/ps5-freebsd-configure.patch"
-          test -f "$source_dir/Include/Python.h"
+      - name: Restore compiler cache
+        id: compiler
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ps5-ubuntu24-clang18-${{ github.sha }}
+          restore-keys: ps5-ubuntu24-clang18-
 
-      - name: Fetch and install PS5 Payload SDK
-        shell: bash
+      - name: Fetch pinned CPython and SDK
         run: |
-          set -eu
-          sdk_source="$RUNNER_TEMP/ps5-payload-sdk-source"
-          sdk_dir="$RUNNER_TEMP/ps5-payload-sdk"
-          git clone --depth 1 \
-            https://github.com/ps5-payload-dev/sdk.git "$sdk_source"
-          git -C "$sdk_source" fetch --depth 1 origin "$PS5_SDK_REF"
-          git -C "$sdk_source" checkout --detach "$PS5_SDK_REF"
-          mkdir -p "$sdk_dir"
-          make -C "$sdk_source" DESTDIR="$sdk_dir" install
-          test -f "$sdk_dir/toolchain/prospero.sh"
+          set -euo pipefail
+          git init -q upstream/cpython
+          git -C upstream/cpython fetch --depth 1 https://github.com/python/cpython.git "$CPYTHON_REF"
+          git -C upstream/cpython checkout --detach FETCH_HEAD
+          git -C upstream/cpython apply "$GITHUB_WORKSPACE/patches/ps5-freebsd-configure.patch"
+          sdk_source="$RUNNER_TEMP/sdk-source"
+          sdk_dir="$RUNNER_TEMP/sdk"
+          git init -q "$sdk_source"
+          git -C "$sdk_source" fetch --depth 1 https://github.com/ps5-payload-dev/sdk.git "$PS5_SDK_REF"
+          git -C "$sdk_source" checkout --detach FETCH_HEAD
+          make -j"$(nproc)" -C "$sdk_source" LLVM_CONFIG=llvm-config-18 DESTDIR="$sdk_dir" install
           echo "PS5_PAYLOAD_SDK=$sdk_dir" >> "$GITHUB_ENV"
 
-      - name: Build standalone and web artifacts
-        shell: bash
+      - name: Build host Python and PS5 runtime
         run: |
-          set -eu
+          set -euo pipefail
+          export HOST_JOBS="$(nproc)" PS5_JOBS="$(nproc)"
+          ccache --zero-stats
           make host-build
           bash tools/build_ps5.sh core
           bash tools/build_ps5.sh web
 
-      - name: Package release assets
-        shell: bash
-        run: bash tools/package_release.sh "$RELEASE_TAG" "$RUNNER_TEMP/python-ps5-release"
+      - name: Package and verify the release artifacts
+        id: metadata
+        run: |
+          set -euo pipefail
+          label="ci-${GITHUB_SHA:0:12}"
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then label="$GITHUB_REF_NAME"; fi
+          bash tools/package_release.sh "$label" "$RUNNER_TEMP/ps5-artifacts"
+          python3 tools/verify_release.py "$RUNNER_TEMP/ps5-artifacts" "$label"
+          echo "name=ps5-python-$label" >> "$GITHUB_OUTPUT"
 
-      - name: Upload assets to GitHub Release
-        shell: bash
+      - name: Report ccache statistics
+        if: always()
+        run: if command -v ccache >/dev/null; then ccache --show-stats; fi
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.metadata.outputs.name }}
+          path: ${{ runner.temp }}/ps5-artifacts/
+          if-no-files-found: error
+
+      - name: Save default-branch compiler cache
+        if: github.event_name != 'pull_request' && github.ref_name == github.event.repository.default_branch && steps.compiler.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ${{ steps.compiler.outputs.cache-primary-key }}
+
+  attest:
+    needs: build
+    if: github.event_name != 'pull_request' && !github.event.repository.private
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: ${{ needs.build.outputs.name }}
+          path: dist/
+      - name: Verify downloaded artifacts
+        run: cd dist && sha256sum -c --strict *-SHA256SUMS
+      - name: Sign build provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            dist/*.elf
+            dist/*.tar.gz
+
+  release:
+    needs: [build, attest]
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: ${{ needs.build.outputs.name }}
+          path: dist/
+      - name: Publish the checked assets for the existing tag
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          set -eu
-          asset_dir="$RUNNER_TEMP/python-ps5-release"
-          gh release upload "$RELEASE_TAG" \
-            "$asset_dir/python-ps5-$RELEASE_TAG.tar.gz" \
-            "$asset_dir/python-ps5-$RELEASE_TAG-python.elf" \
-            "$asset_dir/python-ps5-$RELEASE_TAG-python-web.elf" \
-            "$asset_dir/python-ps5-$RELEASE_TAG-python-app-supervisor.elf" \
-            "$asset_dir/python-ps5-$RELEASE_TAG-SHA256SUMS" \
-            --clobber
+          (cd dist && sha256sum -c --strict *-SHA256SUMS)
+          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" \
+            --verify-tag --generate-notes --title "PS5-Python $GITHUB_REF_NAME"

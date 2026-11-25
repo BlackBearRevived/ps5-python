@@ -17,7 +17,7 @@ level coverage and individual API limitations are tracked separately in
 | Data and compression | Implemented subset | SQLite, zlib, bzip2, xz/liblzma, ZIP, TAR, XML, and related wrappers are statically integrated and smoke-tested | Full upstream compression and archive stress coverage remains pending |
 | Flask web stack | Verified subset | Vendored Flask 3.1.3, Gunicorn 23.0.0, Werkzeug, Jinja2, MarkupSafe, ItsDangerous, Click, and Blinker | Daemon/re-exec, Unix sockets, plugin entry points, reloaders, debuggers, and optional async workers are outside the target |
 | Native/platform boundaries | Documented | PS5-specific filesystem, signals, memory, timing, process, and launcher behavior are tracked in [`ps5-limitations.md`](ps5-limitations.md) | `mmap`, arbitrary native-library loading, advanced descriptor duplication, GUI/Tk, curses, PTY, and subprocess execution remain limited |
-| CI and releases | Implemented | GitHub CI, self-hosted PS5 release workflow, pinned CPython/SDK acquisition, ELF packaging, checksums, and release uploads | Hardware CI still requires an operator-provided PS5 and self-hosted SDK runner |
+| CI and releases | Implemented | GitHub-hosted PS5 builds, pinned CPython/SDK acquisition, ELF packaging, checksums, and build provenance | Console tests require access to a PS5 |
 
 ## Current focus
 
