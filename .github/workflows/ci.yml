@@ -46,7 +46,10 @@ jobs:
 
       - name: Validate shell scripts
         shell: bash
-        run: bash -n tools/*.sh
+        run: |
+          for script in tools/*.sh; do
+            bash -n "$script"
+          done
 
       - name: Validate whitespace and focused Python syntax
         shell: bash
