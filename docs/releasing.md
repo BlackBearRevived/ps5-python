@@ -45,8 +45,8 @@ prefix="python-ps5-$version"
 sha256sum -c --strict "$prefix-SHA256SUMS"
 for asset in "$prefix".tar.gz "$prefix"-*.elf; do
   gh attestation verify "$asset" \
-    --repo BlackBearRedux/ps5-python \
-    --signer-workflow BlackBearRedux/ps5-python/.github/workflows/release.yml \
+    --repo BlackBearRevived/ps5-python \
+    --signer-workflow BlackBearRevived/ps5-python/.github/workflows/release.yml \
     --source-ref "refs/tags/$version"
 done
 ```

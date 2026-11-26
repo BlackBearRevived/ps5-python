@@ -6,10 +6,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/BlackBearRedux/ps5-python/actions/workflows/ci.yml?query=branch%3Amain"><img src="https://github.com/BlackBearRedux/ps5-python/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI status"></a>
-  <a href="https://github.com/BlackBearRedux/ps5-python/releases/latest"><img src="https://img.shields.io/github/v/release/BlackBearRedux/ps5-python?display_name=tag&amp;sort=semver&amp;label=latest%20release" alt="Latest release"></a>
-  <a href="https://github.com/BlackBearRedux/ps5-python/releases"><img src="https://img.shields.io/github/downloads/BlackBearRedux/ps5-python/total?label=downloads" alt="GitHub downloads"></a>
-  <a href="https://github.com/BlackBearRedux/ps5-python/blob/main/LICENSE"><img src="https://img.shields.io/github/license/BlackBearRedux/ps5-python" alt="License"></a>
+  <a href="https://github.com/BlackBearRevived/ps5-python/actions/workflows/ci.yml?query=branch%3Amain"><img src="https://github.com/BlackBearRevived/ps5-python/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI status"></a>
+  <a href="https://github.com/BlackBearRevived/ps5-python/releases/latest"><img src="https://img.shields.io/github/v/release/BlackBearRevived/ps5-python?display_name=tag&amp;sort=semver&amp;label=latest%20release" alt="Latest release"></a>
+  <a href="https://github.com/BlackBearRevived/ps5-python/releases"><img src="https://img.shields.io/github/downloads/BlackBearRevived/ps5-python/total?label=downloads" alt="GitHub downloads"></a>
+  <a href="https://github.com/BlackBearRevived/ps5-python/blob/main/LICENSE"><img src="https://img.shields.io/github/license/BlackBearRevived/ps5-python" alt="License"></a>
   <img src="https://img.shields.io/badge/CPython-3.14.7-3776AB?logo=python&amp;logoColor=white" alt="CPython 3.14.7">
   <img src="https://img.shields.io/badge/platform-PS5-003791?logo=playstation&amp;logoColor=white" alt="PlayStation 5">
 </p>
@@ -257,7 +257,7 @@ web-launcher roadmap.
 ## Manual release deployment
 
 For a prebuilt install, download `python-ps5-<version>.tar.gz` from the
-[Releases](https://github.com/BlackBearRedux/ps5-python/releases) page and
+[Releases](https://github.com/BlackBearRevived/ps5-python/releases) page and
 extract it on your computer. Copy these extracted directories to the PS5 using
 your FTP client:
 
